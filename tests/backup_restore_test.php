@@ -41,6 +41,24 @@ require_once($CFG->libdir . '/phpunit/classes/restore_date_testcase.php');
 #[\PHPUnit\Framework\Attributes\CoversClass(\restore_aidialogue_activity_structure_step::class)]
 final class backup_restore_test extends restore_date_testcase {
     /**
+     * Creates an activity with a known knowledge text and two criteria (Analyse and Custom).
+     *
+     * @param int $courseid The course id.
+     * @param array $extra Extra activity fields.
+     * @return \stdClass The activity record with cmid.
+     */
+    private function create_dialogue(int $courseid, array $extra = []): \stdClass {
+        return $this->getDataGenerator()->create_module('aidialogue', $extra + [
+            'course' => $courseid,
+            'knowledgetext' => 'Test knowledge text.',
+            'criteria' => [
+                ['description' => 'Explains the main idea.', 'bloomslevel' => 1, 'minturns' => 1, 'maxturns' => 2],
+                ['description' => 'Gives an own example.', 'bloomslevel' => 8, 'minturns' => 1, 'maxturns' => 3],
+            ],
+        ]);
+    }
+
+    /**
      * Adds one student session with an opening turn, a criterion turn, a closing turn and one result per criterion.
      *
      * @param \stdClass $aidialogue The activity record.
@@ -110,8 +128,7 @@ final class backup_restore_test extends restore_date_testcase {
 
         $course = $this->getDataGenerator()->create_course();
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $aidialogue = $this->getDataGenerator()->create_module('aidialogue', [
-            'course' => $course->id,
+        $aidialogue = $this->create_dialogue($course->id, [
             'maxattempts' => 3,
             'completionpassed' => 1,
         ]);
@@ -167,7 +184,7 @@ final class backup_restore_test extends restore_date_testcase {
 
         $course = $this->getDataGenerator()->create_course();
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $aidialogue = $this->getDataGenerator()->create_module('aidialogue', ['course' => $course->id]);
+        $aidialogue = $this->create_dialogue($course->id);
         $this->add_session($aidialogue, $student->id);
 
         $newcm = formatactions::cm($course->id)->duplicate(cmid: $aidialogue->cmid);
