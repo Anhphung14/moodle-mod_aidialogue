@@ -524,10 +524,10 @@ EOT
         $grade  = 0.0;
         $report = $rawreport;
 
-        if (preg_match('/^GRADE:([\d.]+)\s*$/m', $rawreport, $matches)) {
+        if (preg_match('/^GRADE:\s*([\d.]+)\s*$/m', $rawreport, $matches)) {
             $grade  = (float) $matches[1];
             $grade  = max(0.0, min(100.0, $grade));
-            $report = trim(preg_replace('/^GRADE:[\d.]+\s*$/m', '', $rawreport));
+            $report = trim(preg_replace('/^GRADE:\s*[\d.]+\s*$/m', '', $rawreport));
         }
 
         return ['grade' => $grade, 'report' => $report];
