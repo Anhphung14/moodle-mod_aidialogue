@@ -82,6 +82,9 @@ class activity_config {
      */
     public readonly array $criteria;
 
+    /** @var int Maximum tokens to request in the completion response. */
+    public readonly int $maxtokens;
+
     /**
      * Private constructor — use the static factory methods.
      */
@@ -96,6 +99,7 @@ class activity_config {
         bool $completionpassed,
         bool $completionexhausted,
         array $criteria,
+        int $maxtokens,
     ) {
         $this->id = $id;
         $this->name = $name;
@@ -107,6 +111,7 @@ class activity_config {
         $this->completionpassed = $completionpassed;
         $this->completionexhausted = $completionexhausted;
         $this->criteria = $criteria;
+        $this->maxtokens = $maxtokens;
     }
 
     /**
@@ -131,6 +136,8 @@ class activity_config {
         if (empty($aiurl) || empty($aiapikey) || empty($aimodel)) {
             throw new \moodle_exception('error:aicredentialsmissing', 'mod_aidialogue');
         }
+
+        $maxtokens = ai_client::normalise_max_tokens((int) get_config('mod_aidialogue', 'maxtokens'));
 
         $criteriarecords = $DB->get_records(
             'aidialogue_criterion',
@@ -161,6 +168,7 @@ class activity_config {
             completionpassed: (bool) $record->completionpassed,
             completionexhausted: (bool) $record->completionexhausted,
             criteria: $criteria,
+            maxtokens: $maxtokens,
         );
     }
 

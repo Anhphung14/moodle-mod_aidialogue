@@ -43,8 +43,21 @@ class ai_client {
     /** @var int Maximum seconds to wait for a response from the AI endpoint. */
     private const TIMEOUT_SECONDS = 60;
 
-    /** @var int Maximum tokens to request in the completion response. */
-    private const MAX_TOKENS = 1024;
+    /** @var int Default maximum tokens to request in the completion response. */
+    public const DEFAULT_MAX_TOKENS = 1024;
+
+    /** @var int Minimum allowed value for the maximum tokens setting. */
+    public const MIN_MAX_TOKENS = 256;
+
+    /**
+     * Normalise a max_tokens value, enforcing the minimum threshold with fallback.
+     *
+     * @param int $tokens Token limit to normalise.
+     * @return int Validated token limit, or DEFAULT_MAX_TOKENS if below minimum.
+     */
+    public static function normalise_max_tokens(int $tokens): int {
+        return $tokens >= self::MIN_MAX_TOKENS ? $tokens : self::DEFAULT_MAX_TOKENS;
+    }
 
     /**
      * Temperature for all chat completions requests.
@@ -79,21 +92,28 @@ class ai_client {
      *     ...
      *   ]
      *
-     * @param string $aiurl    Base URL of the endpoint, e.g. https://api.openai.com/v1
-     *                         The path /chat/completions is appended automatically.
-     * @param string $aiapikey Bearer token / API key.
-     * @param string $aimodel  Model name, e.g. 'gpt-4o'.
-     * @param array  $messages Array of message objects (role + content).
+     * @param string $aiurl     Base URL of the endpoint, e.g. https://api.openai.com/v1
+     *                          The path /chat/completions is appended automatically.
+     * @param string $aiapikey  Bearer token / API key.
+     * @param string $aimodel   Model name, e.g. 'gpt-4o'.
+     * @param array  $messages  Array of message objects (role + content).
+     * @param int    $maxtokens Maximum tokens to request in completion response.
      * @return string  The assistant's reply text (trimmed).
      * @throws \moodle_exception On HTTP error, timeout, or malformed response.
      */
-    public function chat(string $aiurl, string $aiapikey, string $aimodel, array $messages): string {
+    public function chat(
+        string $aiurl,
+        string $aiapikey,
+        string $aimodel,
+        array $messages,
+        int $maxtokens = self::DEFAULT_MAX_TOKENS,
+    ): string {
         $endpoint = rtrim($aiurl, '/') . '/chat/completions';
 
         $payload = json_encode([
             'model'       => $aimodel,
             'messages'    => $messages,
-            'max_tokens'  => self::MAX_TOKENS,
+            'max_tokens'  => self::normalise_max_tokens($maxtokens),
             'temperature' => self::TEMPERATURE,
         ]);
 

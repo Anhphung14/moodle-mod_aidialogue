@@ -69,7 +69,8 @@ final class ai_client_test extends \basic_testcase {
             'https://api.openai.com/v1/',
             'test-api-key',
             'gpt-4o',
-            $messages
+            $messages,
+            2048,
         );
 
         $this->assertSame("Hello from AI!\n\n[MOVE:session_open]", $reply);
@@ -84,7 +85,7 @@ final class ai_client_test extends \basic_testcase {
         $sentpayload = json_decode((string) $capturedrequest->getBody(), true);
         $this->assertSame('gpt-4o', $sentpayload['model']);
         $this->assertSame($messages, $sentpayload['messages']);
-        $this->assertSame(1024, $sentpayload['max_tokens']);
+        $this->assertSame(2048, $sentpayload['max_tokens']);
         $this->assertSame(0.4, $sentpayload['temperature']);
 
         $this->assertFalse($capturedoptions[RequestOptions::HTTP_ERRORS]);
@@ -237,5 +238,87 @@ final class ai_client_test extends \basic_testcase {
         $this->expectException(\moodle_exception::class);
         $this->expectExceptionMessage(get_string('error:aiinvalidjson', 'mod_aidialogue'));
         $client->chat('https://api.openai.com/v1', 'key', 'gpt-4o', [['role' => 'user', 'content' => 'Hi']]);
+    }
+
+    /**
+     * Test chat defaults max_tokens to 1024 when argument is omitted.
+     */
+    public function test_chat_default_max_tokens(): void {
+        $capturedrequest = null;
+        $mockhttp = $this->createMock(http_client::class);
+        $mockhttp->expects($this->once())
+            ->method('send')
+            ->willReturnCallback(
+                function (RequestInterface $req, array $opts) use (&$capturedrequest): Response {
+                    $capturedrequest = $req;
+                    $body = json_encode([
+                        'choices' => [
+                            ['finish_reason' => 'stop', 'message' => ['content' => 'ok']],
+                        ],
+                    ]);
+                    return new Response(200, [], $body);
+                }
+            );
+
+        $client = new ai_client($mockhttp);
+        $client->chat('https://api.openai.com/v1', 'key', 'gpt-4o', [['role' => 'user', 'content' => 'Hi']]);
+
+        $this->assertNotNull($capturedrequest);
+        $sentpayload = json_decode((string) $capturedrequest->getBody(), true);
+        $this->assertSame(ai_client::DEFAULT_MAX_TOKENS, $sentpayload['max_tokens']);
+    }
+
+    /**
+     * Data provider for testing max_tokens boundaries and fallbacks.
+     *
+     * @return array
+     */
+    public static function max_tokens_boundary_provider(): array {
+        return [
+            'below_min_zero'        => [0, ai_client::DEFAULT_MAX_TOKENS],
+            'below_min_negative'    => [-5, ai_client::DEFAULT_MAX_TOKENS],
+            'below_min_boundary'    => [255, ai_client::DEFAULT_MAX_TOKENS],
+            'exact_min_boundary'    => [256, 256],
+            'standard_configured'   => [2048, 2048],
+            'reasoning_large_limit' => [4096, 4096],
+        ];
+    }
+
+    /**
+     * Test chat enforces minimum max_tokens limit and falls back appropriately.
+     *
+     * @param int $inputtokens
+     * @param int $expectedtokens
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('max_tokens_boundary_provider')]
+    public function test_chat_max_tokens_boundary(int $inputtokens, int $expectedtokens): void {
+        $capturedrequest = null;
+        $mockhttp = $this->createMock(http_client::class);
+        $mockhttp->expects($this->once())
+            ->method('send')
+            ->willReturnCallback(
+                function (RequestInterface $req, array $opts) use (&$capturedrequest): Response {
+                    $capturedrequest = $req;
+                    $body = json_encode([
+                        'choices' => [
+                            ['finish_reason' => 'stop', 'message' => ['content' => 'ok']],
+                        ],
+                    ]);
+                    return new Response(200, [], $body);
+                }
+            );
+
+        $client = new ai_client($mockhttp);
+        $client->chat(
+            'https://api.openai.com/v1',
+            'key',
+            'gpt-4o',
+            [['role' => 'user', 'content' => 'Hi']],
+            $inputtokens,
+        );
+
+        $this->assertNotNull($capturedrequest);
+        $sentpayload = json_decode((string) $capturedrequest->getBody(), true);
+        $this->assertSame($expectedtokens, $sentpayload['max_tokens']);
     }
 }

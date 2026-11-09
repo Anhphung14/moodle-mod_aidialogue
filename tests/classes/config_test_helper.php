@@ -32,9 +32,13 @@ final class config_test_helper {
      * Build an activity_config instance via reflection without touching the database.
      *
      * @param criterion_config[]|null $criteria Optional criteria list; defaults to two sample criteria.
+     * @param int                     $maxtokens Optional max_tokens limit; defaults to 1024.
      * @return activity_config
      */
-    public static function make_config(?array $criteria = null): activity_config {
+    public static function make_config(
+        ?array $criteria = null,
+        int $maxtokens = \mod_aidialogue\local\ai_client::DEFAULT_MAX_TOKENS,
+    ): activity_config {
         if ($criteria === null) {
             $criteria = [
                 new criterion_config(
@@ -71,6 +75,7 @@ final class config_test_helper {
             false,
             false,
             $criteria,
+            $maxtokens,
         );
 
         return $config;
