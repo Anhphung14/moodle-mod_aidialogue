@@ -303,6 +303,18 @@ class session_manager {
         aidialogue_update_grades($aidialogue, $session->userid);
 
         $this->update_completion($sessionid);
+
+        // The grade is saved and clamped here, so this is where the old and the new value are both known.
+        $cm = get_coursemodule_from_instance('aidialogue', $session->aidialogueid, 0, false, MUST_EXIST);
+        \mod_aidialogue\event\grade_updated::create([
+            'objectid' => $sessionid,
+            'context' => \context_module::instance($cm->id),
+            'relateduserid' => (int) $session->userid,
+            'other' => [
+                'oldgrade' => $session->teachergrade === null ? null : (float) $session->teachergrade,
+                'newgrade' => $update->teachergrade,
+            ],
+        ])->trigger();
     }
 
     /**

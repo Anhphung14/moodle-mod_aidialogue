@@ -172,6 +172,10 @@ $string['error:airesponsetruncated']  = 'The AI response was cut off because it 
 $string['error:maxattemptsreached']   = 'You have reached the maximum number of attempts for this activity.';
 $string['error:messageempty']         = 'Message cannot be empty.';
 $string['error:messagetoolong']       = 'Message exceeds maximum allowed length.';
+$string['event:grade_updated']        = 'Dialogue grade updated';
+$string['event:report_viewed']        = 'Dialogue report viewed';
+$string['event:session_completed']    = 'Dialogue session completed';
+$string['event:session_started']      = 'Dialogue session started';
 
 // Teacher report — navigation.
 $string['classreport'] = 'Results';

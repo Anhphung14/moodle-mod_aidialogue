@@ -62,6 +62,17 @@ if ($action === 'savegrade' && confirm_sesskey()) {
 }
 
 $PAGE->set_url('/mod/aidialogue/review.php', ['id' => $cm->id, 'session' => $session->id]);
+$event = \mod_aidialogue\event\report_viewed::create([
+    'objectid' => $cm->instance,
+    'context' => $context,
+    'relateduserid' => $session->userid,
+    'other' => [
+        'mode' => 'review',
+        'sessionid' => $session->id,
+    ],
+]);
+$event->trigger();
+
 $PAGE->set_pagelayout('report');
 $PAGE->add_body_class('limitedwidth');
 $PAGE->set_title(fullname($student));
