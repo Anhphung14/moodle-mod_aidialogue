@@ -112,7 +112,7 @@ class dialogue_engine {
             'context' => $context,
             'relateduserid' => $userid,
             'other' => [
-                'attemptnumber' => $session->attemptnumber,
+                'attemptnumber' => (int) $session->attemptnumber,
             ],
         ])->trigger();
 
@@ -414,11 +414,11 @@ class dialogue_engine {
         \mod_aidialogue\event\session_completed::create([
             'objectid' => $session->id,
             'context' => $context,
-            'relateduserid' => $session->userid,
+            'relateduserid' => (int) $session->userid,
             'other' => [
                 'aigrade' => $aigrade,
                 'earlyexit' => (bool) $earlyexit,
-                'attemptnumber' => $session->attemptnumber,
+                'attemptnumber' => (int) $session->attemptnumber,
             ],
         ])->trigger();
 

@@ -168,6 +168,8 @@ final class events_test extends \advanced_testcase {
      * Test session_completed event is triggered when session completes normally.
      */
     public function test_session_completed_event_normal(): void {
+        global $DB;
+
         $singlecriterion = [
             [
                 'sortorder'   => 1,
@@ -196,7 +198,8 @@ final class events_test extends \advanced_testcase {
 
         $this->setUser($student);
         $startresult = $engine->start_session($config, (int) $student->id);
-        $session = $startresult['session'];
+        // Read the session back from the database, as the web service does: its values are strings there.
+        $session = $DB->get_record('aidialogue_session', ['id' => $startresult['session']->id], '*', MUST_EXIST);
 
         $sink = $this->redirectEvents();
         $engine->process_student_turn($config, $session, 'My final answer');
@@ -413,6 +416,54 @@ final class events_test extends \advanced_testcase {
 
         $this->assertNull($event->other['oldgrade']);
         $this->assertStringContainsString("from 'none' to '85'", $event->get_description());
+    }
+
+    /**
+     * Data provider: previous grade, grade given by the teacher, and the grade that is stored (and logged).
+     *
+     * @return array
+     */
+    public static function save_teacher_grade_provider(): array {
+        return [
+            'first grade' => [null, 85.0, 85.0],
+            'changed grade' => [70.0, 92.5, 92.5],
+            'cleared grade' => [70.0, null, null],
+            'grade above 100 is clamped' => [null, 150.0, 100.0],
+        ];
+    }
+
+    /**
+     * Test saving a teacher grade triggers grade_updated once, with the old and the stored new grade.
+     *
+     * @param float|null $oldgrade Grade saved before, or null for none.
+     * @param float|null $given Grade given by the teacher, or null to clear it.
+     * @param float|null $expectednew Grade that is stored and logged.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('save_teacher_grade_provider')]
+    public function test_save_teacher_grade_triggers_grade_updated(?float $oldgrade, ?float $given, ?float $expectednew): void {
+        [, $cm, , $instance, $student, $teacher, $config] = $this->create_activity_fixture();
+
+        $manager = new session_manager();
+        $session = $manager->create_session((int) $instance->id, (int) $student->id, $config);
+        if ($oldgrade !== null) {
+            $manager->save_teacher_grade((int) $session->id, $oldgrade);
+        }
+
+        $this->setUser($teacher);
+        $sink = $this->redirectEvents();
+        $manager->save_teacher_grade((int) $session->id, $given);
+        $events = array_values(array_filter($sink->get_events(), fn($e) => $e instanceof grade_updated));
+        $sink->close();
+
+        $this->assertCount(1, $events);
+        $event = $events[0];
+        $this->assertSame((int) $session->id, (int) $event->objectid);
+        $this->assertSame((int) $teacher->id, (int) $event->userid);
+        $this->assertSame((int) $student->id, (int) $event->relateduserid);
+        $this->assertSame((int) $cm->id, (int) $event->contextinstanceid);
+        $this->assertSame($oldgrade, $event->other['oldgrade']);
+        $this->assertSame($expectednew, $event->other['newgrade']);
+        $this->assertStringContainsString("to '" . ($expectednew ?? 'none') . "'", $event->get_description());
     }
 
     /**

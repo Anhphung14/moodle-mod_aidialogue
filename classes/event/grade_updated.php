@@ -49,7 +49,7 @@ class grade_updated extends \core\event\base {
      */
     public function get_description(): string {
         $oldgrade = isset($this->other['oldgrade']) ? $this->other['oldgrade'] : 'none';
-        $newgrade = $this->other['newgrade'];
+        $newgrade = isset($this->other['newgrade']) ? $this->other['newgrade'] : 'none';
 
         return "The user with id '{$this->userid}' updated the grade for session with id '{$this->objectid}' " .
             "belonging to user with id '{$this->relateduserid}' from '{$oldgrade}' to '{$newgrade}' " .
