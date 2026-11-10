@@ -62,18 +62,9 @@ $criteria = array_values(
     $DB->get_records('aidialogue_criterion', ['aidialogueid' => $cm->instance], 'sortorder ASC')
 );
 
-// Load enrolled students who cannot view the report (i.e. actual students).
-$allusers = get_enrolled_users(
-    $context,
-    'mod/aidialogue:view',
-    0,
-    'u.id, u.firstname, u.lastname, u.firstnamephonetic, u.lastnamephonetic, u.middlename, u.alternatename',
-    'u.lastname ASC, u.firstname ASC'
-);
-$reporters = get_enrolled_users($context, 'mod/aidialogue:viewreport', 0, 'u.id');
-$students = array_filter($allusers, function($user) use ($reporters) {
-    return !isset($reporters[$user->id]);
-});
+// Load the enrolled students the current user may see (limited to one group when the group menu is used).
+$currentgroup = groups_get_activity_group($cm, true) ?: 0;
+$students = \mod_aidialogue\local\report_access::get_students($cm, $context, $currentgroup);
 $studentcount = count($students);
 
 // Load the most recent session per student via SQL to avoid loading all attempts into memory.
@@ -91,6 +82,8 @@ $lastsession = []; // Keyed by userid.
 foreach ($lastsessions as $s) {
     $lastsession[(int)$s->userid] = $s;
 }
+// Only the listed students count in the table and in the statistics.
+$lastsession = array_intersect_key($lastsession, $students);
 
 // Load criterion results for complete sessions.
 $sessionids = [];
@@ -158,6 +151,7 @@ $renderer = $PAGE->get_renderer('mod_aidialogue');
 echo $OUTPUT->header();
 
 echo $OUTPUT->heading(get_string('classreport', 'aidialogue'));
+groups_print_activity_menu($cm, $PAGE->url);
 
 $nstudentskey = $studentcount === 1 ? 'nstudent' : 'nstudents';
 $subtitle = get_string($nstudentskey, 'aidialogue', $studentcount);
