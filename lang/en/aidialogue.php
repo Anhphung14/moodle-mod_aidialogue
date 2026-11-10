@@ -100,13 +100,20 @@ $string['maxturns_help']           = 'The maximum number of exchanges allowed fo
 // Activity form — attempt settings.
 $string['attemptsettingsheader']  = 'Attempt settings';
 $string['maxattempts']            = 'Maximum attempts';
+$string['grademethod']            = 'Grading method';
+$string['grademethod_help']       = 'Which attempt counts for the gradebook when a student has several attempts. Only attempts that a teacher has graded are used. The AI grade is only a suggestion and never reaches the gradebook.';
+$string['gradehighest']           = 'Highest grade';
+$string['gradeaverage']           = 'Average grade';
+$string['gradefirst']             = 'First graded attempt';
+$string['gradelast']              = 'Last graded attempt';
+$string['err_nogradescale']       = 'Scales cannot be used here. Teachers grade in percentages, so choose a maximum grade of 1 or more, or no grade.';
+$string['yourgrade']              = 'Your grade';
+$string['awaitingreview']         = 'Your teacher has not graded this yet. Your grade will appear here and in the gradebook once they have.';
 $string['maxattempts_help']       = 'The maximum number of times a student can attempt this activity. Set to 0 for unlimited attempts.';
 
 // Completion rules.
-$string['completionpassed']          = 'Student must pass all criteria in at least one attempt';
-$string['completionpassed_help']     = 'When enabled, a session is considered complete once the student satisfies all criteria in a single attempt.';
-$string['completionexhausted']       = 'Student must exhaust all allowed attempts';
-$string['completionexhausted_help']  = 'When enabled, a session is marked complete when the student uses up all available attempts without passing. Only applies when both "Mark session as complete when student passes" and a maximum attempt limit are set.';
+$string['completionpassorexhaust']       = 'Student must pass or use all attempts';
+$string['completionpassorexhaust_help']  = 'When enabled, the activity is complete once the student passes or has used all allowed attempts, whichever happens first. A pass means the teacher\'s grade in the gradebook reaches the grade to pass. Without a grade to pass, or with unlimited attempts, the student can only complete the activity by passing.';
 
 // Form validation errors.
 $string['err_atleastonecriterion'] = 'You must define at least one criterion.';
@@ -190,6 +197,7 @@ $string['statuscomplete']       = 'Complete';
 $string['statusactive']         = 'Active';
 $string['statuspending']        = 'Pending';
 $string['nostudents']           = 'No students enrolled.';
+$string['reset_aidialogue_sessions'] = 'All dialogue sessions';
 
 // Teacher report — session review page (review.php).
 $string['rubriceval']            = 'Rubric evaluation';

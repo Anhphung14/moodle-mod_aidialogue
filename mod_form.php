@@ -126,17 +126,50 @@ class mod_aidialogue_mod_form extends moodleform_mod {
         $mform->addRule('maxattempts', null, 'numeric', null, 'client');
         $mform->addHelpButton('maxattempts', 'maxattempts', 'aidialogue');
 
-        $mform->addElement('advcheckbox', 'completionpassed', get_string('completionpassed', 'aidialogue'));
-        $mform->addHelpButton('completionpassed', 'completionpassed', 'aidialogue');
+        // Grade section. The grading method sits at the end of it.
+        $this->standard_grading_coursemodule_elements();
 
-        $mform->addElement('advcheckbox', 'completionexhausted', get_string('completionexhausted', 'aidialogue'));
-        $mform->addHelpButton('completionexhausted', 'completionexhausted', 'aidialogue');
-        // Only meaningful when completionpassed is on AND a max attempt limit is set.
-        $mform->hideIf('completionexhausted', 'completionpassed', 'eq', '0');
-        $mform->hideIf('completionexhausted', 'maxattempts', 'eq', '0');
+        $mform->addElement('select', 'grademethod', get_string('grademethod', 'aidialogue'), [
+            AIDIALOGUE_GRADEHIGHEST => get_string('gradehighest', 'aidialogue'),
+            AIDIALOGUE_GRADEAVERAGE => get_string('gradeaverage', 'aidialogue'),
+            AIDIALOGUE_GRADEFIRST   => get_string('gradefirst', 'aidialogue'),
+            AIDIALOGUE_GRADELAST    => get_string('gradelast', 'aidialogue'),
+        ]);
+        $mform->setDefault('grademethod', AIDIALOGUE_GRADEHIGHEST);
+        $mform->addHelpButton('grademethod', 'grademethod', 'aidialogue');
+        $mform->hideIf('grademethod', 'grade[modgrade_type]', 'eq', 'none');
 
         $this->standard_coursemodule_elements();
         $this->add_action_buttons();
+    }
+
+    /**
+     * Add the custom completion rule to the Completion conditions section.
+     *
+     * @return string[] Names of the added elements.
+     */
+    public function add_completion_rules() {
+        $mform = $this->_form;
+
+        $mform->addElement(
+            'advcheckbox',
+            'completionpassorexhaust',
+            '',
+            get_string('completionpassorexhaust', 'aidialogue'),
+        );
+        $mform->addHelpButton('completionpassorexhaust', 'completionpassorexhaust', 'aidialogue');
+
+        return ['completionpassorexhaust'];
+    }
+
+    /**
+     * Whether the custom completion rule is enabled in the submitted data.
+     *
+     * @param array $data Submitted form data.
+     * @return bool
+     */
+    public function completion_rule_enabled($data) {
+        return !empty($data['completionpassorexhaust']);
     }
 
     /**
@@ -243,6 +276,11 @@ class mod_aidialogue_mod_form extends moodleform_mod {
                     $errors['maxturns[' . $key . ']'] = get_string('err_maxturnsgtminturns', 'aidialogue');
                 }
             }
+        }
+
+        // Teachers grade in percentages, so a scale cannot be used as the activity grade.
+        if (($data['grade'] ?? 0) < 0) {
+            $errors['grade'] = get_string('err_nogradescale', 'aidialogue');
         }
 
         if ((int)($data['maxattempts'] ?? 0) < 0) {

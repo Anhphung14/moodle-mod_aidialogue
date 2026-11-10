@@ -45,11 +45,8 @@ class mod_aidialogue_generator extends testing_module_generator {
         if (!isset($record->maxattempts)) {
             $record->maxattempts = 0; // Unlimited.
         }
-        if (!isset($record->completionpassed)) {
-            $record->completionpassed = 0;
-        }
-        if (!isset($record->completionexhausted)) {
-            $record->completionexhausted = 0;
+        if (!isset($record->completionpassorexhaust)) {
+            $record->completionpassorexhaust = 0;
         }
 
         // Map criteria array to form field arrays if provided.
