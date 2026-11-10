@@ -120,8 +120,7 @@ final class activity_config_test extends \advanced_testcase {
             'name' => 'Cell Division Assessment',
             'knowledgetext' => 'Mitosis produces two genetically identical daughter cells.',
             'maxattempts' => 3,
-            'completionpassed' => 1,
-            'completionexhausted' => 1,
+            'completionpassorexhaust' => 1,
         ];
         $instance = $generator->create_instance($record);
 
@@ -143,8 +142,7 @@ final class activity_config_test extends \advanced_testcase {
         $this->assertSame('dummy-key-123', $config->aiapikey);
         $this->assertSame('gpt-4o', $config->aimodel);
         $this->assertSame(3, $config->maxattempts);
-        $this->assertTrue($config->completionpassed);
-        $this->assertTrue($config->completionexhausted);
+        $this->assertTrue($config->completionpassorexhaust);
 
         // Verify criteria were loaded in sortorder ASC (sortorder 0 before sortorder 1).
         $this->assertCount(2, $config->criteria);
