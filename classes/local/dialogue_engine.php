@@ -87,7 +87,13 @@ class dialogue_engine {
             // Ask AI for the session_open message.
             $firstcriterion = $config->get_criterion(0);
             $messages = $this->promptbuilder->build_session_open_messages($config, $firstcriterion);
-            $rawresponse = $this->aiclient->chat($config->aiurl, $config->aiapikey, $config->aimodel, $messages);
+            $rawresponse = $this->aiclient->chat(
+                $config->aiurl,
+                $config->aiapikey,
+                $config->aimodel,
+                $messages,
+                $config->maxtokens,
+            );
 
             ['move' => $move, 'content' => $content] = $this->promptbuilder->parse_move($rawresponse);
 
@@ -192,7 +198,13 @@ class dialogue_engine {
             $studentturns,
             $forceclose,
         );
-        $rawresponse = $this->aiclient->chat($config->aiurl, $config->aiapikey, $config->aimodel, $messages);
+        $rawresponse = $this->aiclient->chat(
+            $config->aiurl,
+            $config->aiapikey,
+            $config->aimodel,
+            $messages,
+            $config->maxtokens,
+        );
 
         ['move' => $move, 'content' => $aicontent] = $this->promptbuilder->parse_move($rawresponse);
 
@@ -237,6 +249,7 @@ class dialogue_engine {
                     $config->aiapikey,
                     $config->aimodel,
                     $openmessages,
+                    $config->maxtokens,
                 );
                 ['move' => $openmove, 'content' => $opencontent] = $this->promptbuilder->parse_move($openraw);
                 $openmove = $openmove ?? 'criterion_open';
@@ -363,7 +376,13 @@ class dialogue_engine {
 
         // Build the session_close message.
         $closemessages = $this->promptbuilder->build_session_close_messages($config, $allturns, $earlyexit);
-        $closeraw      = $this->aiclient->chat($config->aiurl, $config->aiapikey, $config->aimodel, $closemessages);
+        $closeraw      = $this->aiclient->chat(
+            $config->aiurl,
+            $config->aiapikey,
+            $config->aimodel,
+            $closemessages,
+            $config->maxtokens,
+        );
         ['move' => $closemove, 'content' => $closecontent] = $this->promptbuilder->parse_move($closeraw);
         $closemove = $closemove ?? 'session_close';
 
@@ -391,6 +410,7 @@ class dialogue_engine {
             $config->aiapikey,
             $config->aimodel,
             $studentmessages,
+            $config->maxtokens,
         );
 
         // Teacher report + grade.
@@ -405,6 +425,7 @@ class dialogue_engine {
             $config->aiapikey,
             $config->aimodel,
             $teachermessages,
+            $config->maxtokens,
         );
         ['grade' => $aigrade, 'report' => $teacherreport] = $this->promptbuilder->parse_grade($teacherraw);
 
@@ -536,7 +557,13 @@ EOT
             ],
         ];
 
-        $raw = $this->aiclient->chat($config->aiurl, $config->aiapikey, $config->aimodel, $messages);
+        $raw = $this->aiclient->chat(
+            $config->aiurl,
+            $config->aiapikey,
+            $config->aimodel,
+            $messages,
+            $config->maxtokens,
+        );
         $verdict = strtolower(trim($raw));
 
         return in_array($verdict, ['met', 'partial'], true) ? $verdict : 'partial';
@@ -572,7 +599,13 @@ EOT
         ];
 
         try {
-            return $this->aiclient->chat($config->aiurl, $config->aiapikey, $config->aimodel, $messages);
+            return $this->aiclient->chat(
+                $config->aiurl,
+                $config->aiapikey,
+                $config->aimodel,
+                $messages,
+                $config->maxtokens,
+            );
         } catch (\moodle_exception $e) {
             return '';
         }

@@ -392,4 +392,99 @@ final class dialogue_engine_test extends \advanced_testcase {
         $this->assertSame(2, $state4['attempt_count']);
         $this->assertFalse($state4['can_start']);
     }
+
+    /**
+     * Test dialogue engine passes configured maxtokens across all chat call sites in a full session.
+     */
+    public function test_engine_passes_configured_maxtokens(): void {
+        global $DB;
+
+        set_config('maxtokens', 2048, 'mod_aidialogue');
+
+        $course = $this->getDataGenerator()->create_course();
+        $student = $this->getDataGenerator()->create_user();
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_aidialogue');
+        $instance = $generator->create_instance([
+            'course' => $course->id,
+            'criteria' => [
+                [
+                    'sortorder' => 1,
+                    'bloomslevel' => activity_config::BLOOMS_ANALYSE,
+                    'description' => 'Criterion 1: Chlorophyll',
+                    'minturns' => 1,
+                    'maxturns' => 5,
+                ],
+                [
+                    'sortorder' => 2,
+                    'bloomslevel' => activity_config::BLOOMS_EVALUATE,
+                    'description' => 'Criterion 2: Light intensity',
+                    'minturns' => 1,
+                    'maxturns' => 5,
+                ],
+            ],
+        ]);
+        $config = activity_config::load_from_db((int) $instance->id);
+
+        $replies = [
+            "Welcome!\n\n[MOVE:session_open]", // Session open.
+            "Can you explain more?\n\n[MOVE:probe_deeper]", // Turn 1, criterion 1: probe.
+            "Good explanation!\n\n[MOVE:criterion_close]", // Turn 2, criterion 1: close.
+            "met", // Verdict for criterion 1.
+            "Student explained chlorophyll.", // Evidence for criterion 1.
+            "Now let us discuss light intensity.\n\n[MOVE:criterion_open]", // Criterion 2 opens.
+            "Excellent analysis!\n\n[MOVE:criterion_close]", // Turn 1, criterion 2: close.
+            "met", // Verdict for criterion 2.
+            "Student analysed light curve.", // Evidence for criterion 2.
+            "Session finished!\n\n[MOVE:session_close]", // Session close message.
+            "Student summary report", // Student report.
+            "Teacher report\nGRADE:95.0", // Teacher report with grade.
+        ];
+
+        $capturedtokens = [];
+        $callindex = 0;
+
+        $mockai = $this->createMock(ai_client::class);
+        $mockai->expects($this->exactly(12))
+            ->method('chat')
+            ->willReturnCallback(
+                function (
+                    string $url,
+                    string $key,
+                    string $model,
+                    array $messages,
+                    int $maxtokens = ai_client::DEFAULT_MAX_TOKENS,
+                ) use (
+                    &$capturedtokens,
+                    &$callindex,
+                    $replies,
+                ): string {
+                    $capturedtokens[] = $maxtokens;
+                    return $replies[$callindex++];
+                }
+            );
+
+        $engine = new dialogue_engine(new session_manager(), $mockai, new prompt_builder());
+
+        // 1. start_session (exercises session_open call site).
+        $start = $engine->start_session($config, (int) $student->id);
+
+        // 2. Turn 1 on criterion 1 (exercises probe turn call site).
+        $turn1 = $engine->process_student_turn($config, $start['session'], 'Chlorophyll absorbs red and blue.');
+        $this->assertSame('probe_deeper', $turn1['move']);
+
+        // 3. Turn 2 on criterion 1 (exercises criterion_close, eval, extract evidence, criterion_open).
+        $turn2 = $engine->process_student_turn($config, $start['session'], 'It reflects green light.');
+        $this->assertSame('criterion_open', $turn2['move']);
+
+        // 4. Turn 1 on criterion 2 (exercises criterion_close, eval, extract evidence, session_close, student & teacher reports).
+        $turn3 = $engine->process_student_turn($config, $start['session'], 'Higher intensity increases rate.');
+        $this->assertTrue($turn3['is_complete']);
+        $this->assertSame('session_close', $turn3['move']);
+
+        // Assert all 12 calls across all 8 engine call sites received 2048.
+        $this->assertCount(12, $capturedtokens);
+        foreach ($capturedtokens as $tokens) {
+            $this->assertSame(2048, $tokens);
+        }
+    }
 }

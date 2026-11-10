@@ -17,6 +17,7 @@
 namespace mod_aidialogue;
 
 use mod_aidialogue\local\activity_config;
+use mod_aidialogue\local\ai_client;
 use mod_aidialogue\local\criterion_config;
 use mod_aidialogue\tests\config_test_helper;
 
@@ -153,5 +154,42 @@ final class activity_config_test extends \advanced_testcase {
         $this->assertSame(activity_config::BLOOMS_EVALUATE, $firstcriterion->bloomslevel);
         $this->assertSame('Compare mitosis and meiosis.', $firstcriterion->description);
         $this->assertSame(activity_config::BLOOMS_ANALYSE, $secondcriterion->bloomslevel);
+        $this->assertSame(ai_client::DEFAULT_MAX_TOKENS, $config->maxtokens);
+    }
+
+    /**
+     * Test load_from_db loads configured maxtokens when valid.
+     */
+    public function test_load_from_db_maxtokens_configured(): void {
+        $this->resetAfterTest(true);
+
+        set_config('aiurl', 'https://api.openai.com/v1', 'mod_aidialogue');
+        set_config('aiapikey', 'dummy-key', 'mod_aidialogue');
+        set_config('aimodel', 'gpt-4o', 'mod_aidialogue');
+        set_config('maxtokens', 2048, 'mod_aidialogue');
+
+        $course = $this->getDataGenerator()->create_course();
+        $aidialogue = $this->getDataGenerator()->create_module('aidialogue', ['course' => $course->id]);
+
+        $config = activity_config::load_from_db((int) $aidialogue->id);
+        $this->assertSame(2048, $config->maxtokens);
+    }
+
+    /**
+     * Test load_from_db falls back to default maxtokens when value is below minimum.
+     */
+    public function test_load_from_db_maxtokens_below_minimum_fallback(): void {
+        $this->resetAfterTest(true);
+
+        set_config('aiurl', 'https://api.openai.com/v1', 'mod_aidialogue');
+        set_config('aiapikey', 'dummy-key', 'mod_aidialogue');
+        set_config('aimodel', 'gpt-4o', 'mod_aidialogue');
+        set_config('maxtokens', 100, 'mod_aidialogue');
+
+        $course = $this->getDataGenerator()->create_course();
+        $aidialogue = $this->getDataGenerator()->create_module('aidialogue', ['course' => $course->id]);
+
+        $config = activity_config::load_from_db((int) $aidialogue->id);
+        $this->assertSame(ai_client::DEFAULT_MAX_TOKENS, $config->maxtokens);
     }
 }

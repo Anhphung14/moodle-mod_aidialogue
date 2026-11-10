@@ -24,6 +24,9 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+use mod_aidialogue\admin\setting_maxtokens;
+use mod_aidialogue\local\ai_client;
+
 if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_heading(
         'mod_aidialogue/aiheader',
@@ -52,5 +55,17 @@ if ($ADMIN->fulltree) {
         get_string('aimodel_desc', 'aidialogue'),
         'gpt-4o',
         PARAM_TEXT,
+    ));
+
+    $descdata = (object) [
+        'default' => ai_client::DEFAULT_MAX_TOKENS,
+        'min'     => ai_client::MIN_MAX_TOKENS,
+    ];
+    $settings->add(new setting_maxtokens(
+        'mod_aidialogue/maxtokens',
+        get_string('aimaxtokens', 'aidialogue'),
+        get_string('aimaxtokens_desc', 'aidialogue', $descdata),
+        ai_client::DEFAULT_MAX_TOKENS,
+        PARAM_INT,
     ));
 }
