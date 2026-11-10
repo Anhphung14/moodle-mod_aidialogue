@@ -85,6 +85,9 @@ class restore_aidialogue_activity_structure_step extends restore_activity_struct
     /**
      * Restores a session. Turns and results point at it, so the mapping is saved.
      *
+     * A session of a user who is not part of the restore is skipped: without a user, several sessions
+     * would get user 0 and the same attempt number, which breaks the unique index and aborts the restore.
+     *
      * @param array $data Data read from the XML.
      */
     protected function process_aidialogue_session($data) {
@@ -95,12 +98,21 @@ class restore_aidialogue_activity_structure_step extends restore_activity_struct
         $data->aidialogueid = $this->get_new_parentid('aidialogue');
         $data->userid = $this->get_mappingid('user', $data->userid);
 
+        if (!$data->userid) {
+            // The turns and results of this session check the parent id and skip too.
+            // Mapping to 0 also stops them from using the previous session's id.
+            $this->set_mapping('aidialogue_session', $oldid, 0);
+            return;
+        }
+
         $newitemid = $DB->insert_record('aidialogue_session', $data);
         $this->set_mapping('aidialogue_session', $oldid, $newitemid);
     }
 
     /**
      * Restores a turn. The criterion is empty for session open and close turns, and must stay empty.
+     *
+     * A turn of a criterion that no longer exists becomes a turn without a criterion.
      *
      * @param array $data Data read from the XML.
      */
@@ -109,8 +121,12 @@ class restore_aidialogue_activity_structure_step extends restore_activity_struct
 
         $data = (object) $data;
         $data->sessionid = $this->get_new_parentid('aidialogue_session');
+        if (!$data->sessionid) {
+            return;
+        }
+
         if (!empty($data->criterionid)) {
-            $data->criterionid = $this->get_mappingid('aidialogue_criterion', $data->criterionid);
+            $data->criterionid = $this->get_mappingid('aidialogue_criterion', $data->criterionid) ?: null;
         } else {
             $data->criterionid = null;
         }
@@ -119,7 +135,7 @@ class restore_aidialogue_activity_structure_step extends restore_activity_struct
     }
 
     /**
-     * Restores a criterion result.
+     * Restores a criterion result. A result of a criterion that no longer exists is skipped.
      *
      * @param array $data Data read from the XML.
      */
@@ -129,6 +145,9 @@ class restore_aidialogue_activity_structure_step extends restore_activity_struct
         $data = (object) $data;
         $data->sessionid = $this->get_new_parentid('aidialogue_session');
         $data->criterionid = $this->get_mappingid('aidialogue_criterion', $data->criterionid);
+        if (!$data->sessionid || !$data->criterionid) {
+            return;
+        }
 
         $DB->insert_record('aidialogue_criterion_result', $data);
     }
