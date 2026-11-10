@@ -58,6 +58,8 @@ class custom_completion extends activity_custom_completion {
     /**
      * Whether the user has at least one completed session with all criteria met.
      *
+     * A session with no criterion results does not count: "none failed" is not a pass.
+     *
      * @param \stdClass $aidialogue Activity instance record.
      * @param int       $userid     User ID being evaluated.
      * @return bool
@@ -70,6 +72,11 @@ class custom_completion extends activity_custom_completion {
                  WHERE s.aidialogueid = :aidialogueid
                    AND s.userid       = :userid
                    AND s.status       = 'complete'
+                   AND EXISTS (
+                           SELECT 1
+                             FROM {aidialogue_criterion_result} cr2
+                            WHERE cr2.sessionid = s.id
+                       )
                    AND NOT EXISTS (
                            SELECT 1
                              FROM {aidialogue_criterion_result} cr

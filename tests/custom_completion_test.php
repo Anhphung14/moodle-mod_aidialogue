@@ -134,6 +134,22 @@ final class custom_completion_test extends \advanced_testcase {
     }
 
     /**
+     * A completed session without any criterion result is not a pass, even though no criterion failed.
+     */
+    public function test_session_without_results_is_not_a_pass(): void {
+        global $DB;
+
+        [$course, $student, $aidialogue] = $this->create_activity(0);
+        $session = $this->add_session($aidialogue, $student->id, 'complete', 'met');
+        $this->assertSame(COMPLETION_COMPLETE, $this->get_rule_state($course, $aidialogue, $student->id));
+
+        // The same session with its results removed (corrupted or empty) must not pass.
+        $DB->delete_records('aidialogue_criterion_result', ['sessionid' => $session->id]);
+
+        $this->assertSame(COMPLETION_INCOMPLETE, $this->get_rule_state($course, $aidialogue, $student->id));
+    }
+
+    /**
      * Closing a session updates completion straight away, without the student viewing the activity.
      */
     public function test_close_session_updates_completion(): void {
