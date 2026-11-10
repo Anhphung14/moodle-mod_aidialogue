@@ -538,8 +538,34 @@ function aidialogue_reset_course_form_defaults(stdClass $course): array {
 }
 
 /**
+ * Clear the gradebook grades of every AI Dialogue activity in a course.
+ *
+ * The grades come from the sessions, so they are cleared together with them on a course reset.
+ *
+ * @param int $courseid The course id.
+ * @param string $type Unused, kept for the standard signature of this callback.
+ */
+function aidialogue_reset_gradebook(int $courseid, string $type = ''): void {
+    global $DB;
+
+    $aidialogues = $DB->get_records_sql("
+            SELECT a.*, cm.idnumber AS cmidnumber, a.course AS courseid
+              FROM {modules} m
+              JOIN {course_modules} cm ON m.id = cm.module
+              JOIN {aidialogue} a ON cm.instance = a.id
+             WHERE m.name = 'aidialogue' AND cm.course = ?", [$courseid]);
+
+    foreach ($aidialogues as $aidialogue) {
+        aidialogue_grade_item_update($aidialogue, 'reset');
+    }
+}
+
+/**
  * Implementation of the reset course functionality, deleting dialogue sessions
  * for activities in the given course.
+ *
+ * The grades that came from those sessions are cleared too, unless the gradebook section of
+ * the reset form already deletes all grades.
  *
  * @param stdClass $data The data submitted from the reset course.
  * @return array Status array.
@@ -567,6 +593,11 @@ function aidialogue_reset_userdata(stdClass $data): array {
             'item' => get_string('reset_aidialogue_sessions', 'aidialogue'),
             'error' => false,
         ];
+
+        // Without the sessions the grades have nothing to stand on.
+        if (empty($data->reset_gradebook_grades)) {
+            aidialogue_reset_gradebook($data->courseid);
+        }
     }
 
     return $status;

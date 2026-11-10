@@ -30,6 +30,7 @@ use mod_aidialogue\local\session_manager;
 #[\PHPUnit\Framework\Attributes\CoversFunction('aidialogue_reset_course_form_definition')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('aidialogue_reset_course_form_defaults')]
 #[\PHPUnit\Framework\Attributes\CoversFunction('aidialogue_reset_userdata')]
+#[\PHPUnit\Framework\Attributes\CoversFunction('aidialogue_reset_gradebook')]
 final class course_reset_test extends \advanced_testcase {
     /**
      * Set up before each test.
@@ -100,6 +101,81 @@ final class course_reset_test extends \advanced_testcase {
         $defaults = aidialogue_reset_course_form_defaults($course);
 
         $this->assertEquals(['reset_aidialogue_sessions' => 1], $defaults);
+    }
+
+    /**
+     * Creates an activity with a complete session graded by the teacher, so a grade is in the gradebook.
+     *
+     * @param \stdClass $course The course.
+     * @param float $grade The teacher grade.
+     * @return array [activity record, student record]
+     */
+    private function create_graded_activity(\stdClass $course, float $grade): array {
+        global $DB;
+
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $instance = $this->getDataGenerator()->create_module('aidialogue', ['course' => $course->id, 'grade' => 100]);
+        $manager = new session_manager();
+        $session = $manager->create_session(
+            (int) $instance->id,
+            (int) $student->id,
+            activity_config::load_from_db((int) $instance->id),
+        );
+        $DB->set_field('aidialogue_session', 'status', 'complete', ['id' => $session->id]);
+        $manager->save_teacher_grade((int) $session->id, $grade);
+
+        return [$instance, $student];
+    }
+
+    /**
+     * Reads a student's grade for the activity from the gradebook.
+     *
+     * @param \stdClass $course The course.
+     * @param \stdClass $instance The activity record.
+     * @param \stdClass $student The student.
+     * @return float|null The grade, or null when there is none.
+     */
+    private function get_gradebook_grade(\stdClass $course, \stdClass $instance, \stdClass $student): ?float {
+        $info = grade_get_grades($course->id, 'mod', 'aidialogue', $instance->id, $student->id);
+        $grade = $info->items[0]->grades[$student->id]->grade ?? null;
+        return $grade === null ? null : (float) $grade;
+    }
+
+    /**
+     * Data provider: the reset form values and whether the gradebook grade of the target course is cleared.
+     *
+     * @return array
+     */
+    public static function reset_gradebook_provider(): array {
+        return [
+            'sessions ticked clears the grades' => [['reset_aidialogue_sessions' => 1], null],
+            'sessions unticked keeps the grades' => [['reset_aidialogue_sessions' => 0], 80.0],
+        ];
+    }
+
+    /**
+     * Test the grades that came from the sessions are cleared with them, and only in the reset course.
+     *
+     * @param array $formdata Reset form values.
+     * @param float|null $expectedgrade Expected gradebook grade of the reset course afterwards.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('reset_gradebook_provider')]
+    public function test_reset_userdata_clears_gradebook_grades(array $formdata, ?float $expectedgrade): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/mod/aidialogue/lib.php');
+        require_once($CFG->libdir . '/gradelib.php');
+
+        $course1 = $this->getDataGenerator()->create_course();
+        $course2 = $this->getDataGenerator()->create_course();
+        [$instance1, $student1] = $this->create_graded_activity($course1, 80.0);
+        [$instance2, $student2] = $this->create_graded_activity($course2, 70.0);
+        $this->assertEquals(80.0, $this->get_gradebook_grade($course1, $instance1, $student1));
+
+        aidialogue_reset_userdata((object) (['courseid' => $course1->id] + $formdata));
+
+        $this->assertSame($expectedgrade, $this->get_gradebook_grade($course1, $instance1, $student1));
+        // The other course keeps its grade.
+        $this->assertEquals(70.0, $this->get_gradebook_grade($course2, $instance2, $student2));
     }
 
     /**
