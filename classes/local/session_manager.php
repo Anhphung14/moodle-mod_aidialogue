@@ -220,9 +220,9 @@ class session_manager {
     }
 
     /**
-     * Set session status to 'active' and record timestarted (first real turn).
+     * Set a pending session to 'active' and record timestarted (first real turn).
      *
-     * Only sets timestarted if it hasn't been set yet.
+     * Does nothing when the stored status is not 'pending'. Only sets timestarted if it hasn't been set yet.
      *
      * @param int $sessionid Session ID.
      */
@@ -230,6 +230,12 @@ class session_manager {
         global $DB;
 
         $session = $DB->get_record('aidialogue_session', ['id' => $sessionid], 'id, status, timestarted', MUST_EXIST);
+
+        // Only a pending session is activated. A caller holding an older copy of the record must not
+        // turn a session that is already active, or already complete, into something else.
+        if ($session->status !== 'pending') {
+            return;
+        }
 
         $update = new \stdClass();
         $update->id           = $sessionid;

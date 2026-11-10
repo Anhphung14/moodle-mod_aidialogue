@@ -371,6 +371,9 @@ class dialogue_engine {
      * Whether the student left early is read from the criterion results, not from
      * the caller, so a retry through a different entry point keeps the same meaning.
      *
+     * A session that is already complete is left as it is: a second request that arrives after
+     * the first one finished gets the stored closing message and changes nothing.
+     *
      * @param activity_config $config  Activity config.
      * @param \stdClass       $session Session record.
      * @return array  Same shape as process_student_turn() return.
@@ -396,6 +399,15 @@ class dialogue_engine {
                 $closecontent = $turn->content;
                 break;
             }
+        }
+
+        if ($session->status === 'complete') {
+            // Another request closed this session first. Nothing is written or reported a second time.
+            return [
+                'ai_message'  => $closecontent ?? '',
+                'move'        => 'session_close',
+                'is_complete' => true,
+            ];
         }
 
         if ($closecontent === null) {
