@@ -51,7 +51,7 @@ function aidialogue_supports($feature) {
         FEATURE_GRADE_OUTCOMES          => false,
         FEATURE_BACKUP_MOODLE2          => true,
         FEATURE_SHOW_DESCRIPTION        => true,
-        FEATURE_MOD_PURPOSE             => MOD_PURPOSE_COMMUNICATION,
+        FEATURE_MOD_PURPOSE             => MOD_PURPOSE_ASSESSMENT,
         default                         => null,
     };
 }
