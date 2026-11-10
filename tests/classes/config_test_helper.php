@@ -73,7 +73,6 @@ final class config_test_helper {
             'gpt-4o',
             0,
             false,
-            false,
             $criteria,
             $maxtokens,
         );

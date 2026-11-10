@@ -52,13 +52,27 @@ $student = $DB->get_record('user', ['id' => $session->userid], '*', MUST_EXIST);
 
 // Handle teacher grade save.
 if ($action === 'savegrade' && confirm_sesskey()) {
-    $rawgrade = required_param('teachergrade', PARAM_FLOAT);
-    $grade    = max(0.0, min(100.0, $rawgrade));
-    $DB->set_field('aidialogue_session', 'teachergrade', $grade, ['id' => $session->id]);
+    // An empty field clears the teacher grade. It must not turn into a real zero.
+    $rawgrade = trim(optional_param('teachergrade', '', PARAM_RAW));
+    if ($rawgrade === '' || is_numeric($rawgrade)) {
+        $grade = $rawgrade === '' ? null : (float) $rawgrade;
+        (new \mod_aidialogue\local\session_manager())->save_teacher_grade($session->id, $grade);
+    }
     redirect(new moodle_url('/mod/aidialogue/review.php', ['id' => $cm->id, 'session' => $session->id]));
 }
 
 $PAGE->set_url('/mod/aidialogue/review.php', ['id' => $cm->id, 'session' => $session->id]);
+$event = \mod_aidialogue\event\report_viewed::create([
+    'objectid' => $cm->instance,
+    'context' => $context,
+    'relateduserid' => $session->userid,
+    'other' => [
+        'mode' => 'review',
+        'sessionid' => $session->id,
+    ],
+]);
+$event->trigger();
+
 $PAGE->set_pagelayout('report');
 $PAGE->add_body_class('limitedwidth');
 $PAGE->set_title(fullname($student));

@@ -117,18 +117,39 @@ class session_manager {
     }
 
     /**
-     * Delete a session and its criterion_result rows.
-     *
-     * Used to clean up an orphaned pending session when start_session() fails
-     * before the opening AI turn is stored.
+     * Delete a session and its associated turns and criterion_result rows.
      *
      * @param int $sessionid Session ID to delete.
      */
     public function delete_session(int $sessionid): void {
+        $this->delete_sessions([$sessionid]);
+    }
+
+    /**
+     * Delete multiple sessions and their associated turns and criterion_result rows.
+     *
+     * Chunked to stay within database IN-clause limits and executed in a delegated transaction.
+     *
+     * @param int[] $sessionids List of session IDs to delete.
+     */
+    public function delete_sessions(array $sessionids): void {
         global $DB;
-        $DB->delete_records('aidialogue_criterion_result', ['sessionid' => $sessionid]);
-        $DB->delete_records('aidialogue_turn', ['sessionid' => $sessionid]);
-        $DB->delete_records('aidialogue_session', ['id'        => $sessionid]);
+
+        if (empty($sessionids)) {
+            return;
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $sessionids)));
+        $transaction = $DB->start_delegated_transaction();
+
+        foreach (array_chunk($ids, 1000) as $chunk) {
+            [$insql, $inparams] = $DB->get_in_or_equal($chunk);
+            $DB->delete_records_select('aidialogue_criterion_result', "sessionid {$insql}", $inparams);
+            $DB->delete_records_select('aidialogue_turn', "sessionid {$insql}", $inparams);
+            $DB->delete_records_select('aidialogue_session', "id {$insql}", $inparams);
+        }
+
+        $transaction->allow_commit();
     }
 
     /**
@@ -253,6 +274,70 @@ class session_manager {
         $update->timemodified  = $now;
 
         $DB->update_record('aidialogue_session', $update);
+
+        $this->update_completion($sessionid);
+    }
+
+    /**
+     * Save, change or clear the teacher's grade for a session, then update the gradebook and completion.
+     *
+     * The teacher's grade is the only grade that reaches the gradebook. Passing null clears it,
+     * which removes the student's gradebook entry unless another attempt is still graded.
+     *
+     * @param int        $sessionid Session ID.
+     * @param float|null $grade     Teacher grade as a percentage (0-100), or null to clear it.
+     */
+    public function save_teacher_grade(int $sessionid, ?float $grade): void {
+        global $CFG, $DB;
+        require_once($CFG->dirroot . '/mod/aidialogue/lib.php');
+
+        $session = $DB->get_record('aidialogue_session', ['id' => $sessionid], '*', MUST_EXIST);
+
+        $update = new \stdClass();
+        $update->id           = $sessionid;
+        $update->teachergrade = $grade === null ? null : max(0.0, min(100.0, $grade));
+        $update->timemodified = time();
+        $DB->update_record('aidialogue_session', $update);
+
+        $aidialogue = $DB->get_record('aidialogue', ['id' => $session->aidialogueid], '*', MUST_EXIST);
+        aidialogue_update_grades($aidialogue, $session->userid);
+
+        $this->update_completion($sessionid);
+
+        // The grade is saved and clamped here, so this is where the old and the new value are both known.
+        $cm = get_coursemodule_from_instance('aidialogue', $session->aidialogueid, 0, false, MUST_EXIST);
+        \mod_aidialogue\event\grade_updated::create([
+            'objectid' => $sessionid,
+            'context' => \context_module::instance($cm->id),
+            'relateduserid' => (int) $session->userid,
+            'other' => [
+                'oldgrade' => $session->teachergrade === null ? null : (float) $session->teachergrade,
+                'newgrade' => $update->teachergrade,
+            ],
+        ])->trigger();
+    }
+
+    /**
+     * Ask Moodle to recalculate the student's activity completion after a session closed.
+     *
+     * Without this, completion would only refresh the next time the student views the activity.
+     *
+     * @param int $sessionid Session ID that was just closed.
+     */
+    private function update_completion(int $sessionid): void {
+        global $CFG, $DB;
+        require_once($CFG->libdir . '/completionlib.php');
+
+        $session = $DB->get_record('aidialogue_session', ['id' => $sessionid], 'aidialogueid, userid', MUST_EXIST);
+        $cm = get_coursemodule_from_instance('aidialogue', $session->aidialogueid, 0, false, IGNORE_MISSING);
+        if (!$cm) {
+            return;
+        }
+
+        $completion = new \completion_info(get_course($cm->course));
+        if ($completion->is_enabled($cm)) {
+            $completion->update_state($cm, COMPLETION_UNKNOWN, $session->userid);
+        }
     }
 
     /**

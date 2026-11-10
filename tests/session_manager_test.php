@@ -257,4 +257,45 @@ final class session_manager_test extends \advanced_testcase {
         $this->assertSame(1, $DB->count_records('aidialogue_turn', ['sessionid' => $session2->id]));
         $this->assertSame(1, $DB->count_records('aidialogue_criterion_result', ['sessionid' => $session2->id]));
     }
+
+    /**
+     * Test delete_sessions batches deletion across multiple sessions.
+     */
+    public function test_delete_sessions(): void {
+        global $DB;
+
+        $course = $this->getDataGenerator()->create_course();
+        $student1 = $this->getDataGenerator()->create_user();
+        $student2 = $this->getDataGenerator()->create_user();
+        $student3 = $this->getDataGenerator()->create_user();
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_aidialogue');
+        $instance = $generator->create_instance(['course' => $course->id]);
+        $config = activity_config::load_from_db((int) $instance->id);
+
+        $manager = new session_manager();
+        $session1 = $manager->create_session((int) $instance->id, (int) $student1->id, $config);
+        $manager->add_turn((int) $session1->id, null, 'ai', 'session_open', 'Prompt 1');
+
+        $session2 = $manager->create_session((int) $instance->id, (int) $student2->id, $config);
+        $manager->add_turn((int) $session2->id, null, 'ai', 'session_open', 'Prompt 2');
+
+        $session3 = $manager->create_session((int) $instance->id, (int) $student3->id, $config);
+        $manager->add_turn((int) $session3->id, null, 'ai', 'session_open', 'Prompt 3');
+
+        // Delete empty array is a safe no-op.
+        $manager->delete_sessions([]);
+        $this->assertSame(3, $DB->count_records('aidialogue_session', ['aidialogueid' => $instance->id]));
+
+        // Batch delete sessions 1 and 2.
+        $manager->delete_sessions([(int) $session1->id, (int) $session2->id]);
+
+        $this->assertFalse($DB->record_exists('aidialogue_session', ['id' => $session1->id]));
+        $this->assertFalse($DB->record_exists('aidialogue_session', ['id' => $session2->id]));
+        $this->assertSame(0, $DB->count_records('aidialogue_turn', ['sessionid' => $session1->id]));
+        $this->assertSame(0, $DB->count_records('aidialogue_turn', ['sessionid' => $session2->id]));
+
+        // Session 3 remains untouched.
+        $this->assertTrue($DB->record_exists('aidialogue_session', ['id' => $session3->id]));
+        $this->assertSame(1, $DB->count_records('aidialogue_turn', ['sessionid' => $session3->id]));
+    }
 }
