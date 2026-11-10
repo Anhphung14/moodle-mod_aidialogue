@@ -426,18 +426,18 @@ final class dialogue_engine_test extends \advanced_testcase {
         $config = activity_config::load_from_db((int) $instance->id);
 
         $replies = [
-            "Welcome!\n\n[MOVE:session_open]",
-            "Can you explain more?\n\n[MOVE:probe_deeper]",
-            "Good explanation!\n\n[MOVE:criterion_close]",
-            "met",
-            "Student explained chlorophyll.",
-            "Now let us discuss light intensity.\n\n[MOVE:criterion_open]",
-            "Excellent analysis!\n\n[MOVE:criterion_close]",
-            "met",
-            "Student analysed light curve.",
-            "Session finished!\n\n[MOVE:session_close]",
-            "Student summary report",
-            "Teacher report\nGRADE:95.0",
+            "Welcome!\n\n[MOVE:session_open]", // Session open.
+            "Can you explain more?\n\n[MOVE:probe_deeper]", // Turn 1, criterion 1: probe.
+            "Good explanation!\n\n[MOVE:criterion_close]", // Turn 2, criterion 1: close.
+            "met", // Verdict for criterion 1.
+            "Student explained chlorophyll.", // Evidence for criterion 1.
+            "Now let us discuss light intensity.\n\n[MOVE:criterion_open]", // Criterion 2 opens.
+            "Excellent analysis!\n\n[MOVE:criterion_close]", // Turn 1, criterion 2: close.
+            "met", // Verdict for criterion 2.
+            "Student analysed light curve.", // Evidence for criterion 2.
+            "Session finished!\n\n[MOVE:session_close]", // Session close message.
+            "Student summary report", // Student report.
+            "Teacher report\nGRADE:95.0", // Teacher report with grade.
         ];
 
         $capturedtokens = [];
@@ -468,7 +468,6 @@ final class dialogue_engine_test extends \advanced_testcase {
         // 1. start_session (exercises session_open call site).
         $start = $engine->start_session($config, (int) $student->id);
 
-        // 2. Turn 1 on criterion 1 (exercises probe turn call site).
         // 2. Turn 1 on criterion 1 (exercises probe turn call site).
         $turn1 = $engine->process_student_turn($config, $start['session'], 'Chlorophyll absorbs red and blue.');
         $this->assertSame('probe_deeper', $turn1['move']);
