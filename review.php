@@ -50,6 +50,11 @@ $session = $DB->get_record(
 );
 $student = $DB->get_record('user', ['id' => $session->userid], '*', MUST_EXIST);
 
+// With separate groups, a teacher only sees the students of their own groups.
+if (!\mod_aidialogue\local\report_access::can_view_user($course, $cm, (int) $session->userid)) {
+    throw new \moodle_exception('nopermissions', 'error', '', get_capability_string('mod/aidialogue:viewreport'));
+}
+
 // Reports and the AI grade can be saved before a session is closed (close recovery).
 // Teachers only see them once the session is complete.
 if ($session->status !== 'complete') {

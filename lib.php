@@ -42,8 +42,8 @@ const AIDIALOGUE_GRADELAST = 4;
 function aidialogue_supports($feature) {
     return match ($feature) {
         FEATURE_MOD_ARCHETYPE           => MOD_ARCHETYPE_OTHER,
-        FEATURE_GROUPS                  => false,
-        FEATURE_GROUPINGS               => false,
+        FEATURE_GROUPS                  => true,
+        FEATURE_GROUPINGS               => true,
         FEATURE_MOD_INTRO               => true,
         FEATURE_COMPLETION_TRACKS_VIEWS => true,
         FEATURE_COMPLETION_HAS_RULES    => true,
