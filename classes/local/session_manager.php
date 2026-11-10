@@ -117,18 +117,39 @@ class session_manager {
     }
 
     /**
-     * Delete a session and its criterion_result rows.
-     *
-     * Used to clean up an orphaned pending session when start_session() fails
-     * before the opening AI turn is stored.
+     * Delete a session and its associated turns and criterion_result rows.
      *
      * @param int $sessionid Session ID to delete.
      */
     public function delete_session(int $sessionid): void {
+        $this->delete_sessions([$sessionid]);
+    }
+
+    /**
+     * Delete multiple sessions and their associated turns and criterion_result rows.
+     *
+     * Chunked to stay within database IN-clause limits and executed in a delegated transaction.
+     *
+     * @param int[] $sessionids List of session IDs to delete.
+     */
+    public function delete_sessions(array $sessionids): void {
         global $DB;
-        $DB->delete_records('aidialogue_criterion_result', ['sessionid' => $sessionid]);
-        $DB->delete_records('aidialogue_turn', ['sessionid' => $sessionid]);
-        $DB->delete_records('aidialogue_session', ['id'        => $sessionid]);
+
+        if (empty($sessionids)) {
+            return;
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $sessionids)));
+        $transaction = $DB->start_delegated_transaction();
+
+        foreach (array_chunk($ids, 1000) as $chunk) {
+            [$insql, $inparams] = $DB->get_in_or_equal($chunk);
+            $DB->delete_records_select('aidialogue_criterion_result', "sessionid {$insql}", $inparams);
+            $DB->delete_records_select('aidialogue_turn', "sessionid {$insql}", $inparams);
+            $DB->delete_records_select('aidialogue_session', "id {$insql}", $inparams);
+        }
+
+        $transaction->allow_commit();
     }
 
     /**
