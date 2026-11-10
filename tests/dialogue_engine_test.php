@@ -695,6 +695,54 @@ final class dialogue_engine_test extends \advanced_testcase {
     }
 
     /**
+     * Data provider: the entry point of the late request that arrives after the session was closed.
+     *
+     * @return array
+     */
+    public static function late_close_provider(): array {
+        return [
+            'late chat message' => ['message'],
+            'late End session' => ['end'],
+        ];
+    }
+
+    /**
+     * Test a close request that arrives after another one finished leaves the completed session as it is.
+     *
+     * @param string $via Entry point of the late request: 'message' or 'end'.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('late_close_provider')]
+    public function test_close_of_completed_session_changes_nothing(string $via): void {
+        global $DB;
+
+        [$config, $session] = $this->start_closable_session();
+
+        // The first request closes the session.
+        $this->engine_with_replies([
+            "Time is up.\n\n[MOVE:criterion_close]", // Turn response (forced close).
+            'Student mentioned chlorophyll.', // Evidence.
+            "Goodbye.\n\n[MOVE:session_close]", // Closing message.
+            'Student report', // Student report.
+            "Teacher report\nGRADE:50.0", // Teacher report with grade.
+        ])->process_student_turn($config, $session, 'Only turn.');
+        $DB->set_field('aidialogue_session', 'timefinished', 1000, ['id' => $session->id]);
+
+        // The second request still holds the session as it was before the close, and asks for no AI call.
+        $sink = $this->redirectEvents();
+        $engine = $this->engine_with_replies([]);
+        $result = $via === 'end'
+            ? $engine->end_session_early($config, $session)
+            : $engine->process_student_turn($config, $session, 'Late message.');
+
+        $this->assertTrue($result['is_complete']);
+        $this->assertSame('session_close', $result['move']);
+        $this->assertSame('Goodbye.', $result['ai_message']);
+        $this->assertSame(1000, (int) $DB->get_field('aidialogue_session', 'timefinished', ['id' => $session->id]));
+        $this->assertCount(0, $this->completed_events($sink));
+        $this->assertSame(1, $DB->count_records('aidialogue_turn', ['sessionid' => $session->id, 'move' => 'session_close']));
+    }
+
+    /**
      * Data provider: which entry point fails first, which one retries, and the expected early exit flag.
      *
      * @return array

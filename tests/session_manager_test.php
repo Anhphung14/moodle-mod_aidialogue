@@ -298,4 +298,52 @@ final class session_manager_test extends \advanced_testcase {
         $this->assertTrue($DB->record_exists('aidialogue_session', ['id' => $session3->id]));
         $this->assertSame(1, $DB->count_records('aidialogue_turn', ['sessionid' => $session3->id]));
     }
+
+    /**
+     * Data provider: stored statuses that activate_session() must leave alone.
+     *
+     * @return array
+     */
+    public static function not_pending_status_provider(): array {
+        return [
+            'already active' => ['active'],
+            'already complete' => ['complete'],
+        ];
+    }
+
+    /**
+     * Test activate_session() does not change a session that is no longer pending.
+     *
+     * A late request can hold an older copy of the record, so the stored status decides.
+     *
+     * @param string $status The stored status of the session.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('not_pending_status_provider')]
+    public function test_activate_session_ignores_session_that_is_not_pending(string $status): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $course = $this->getDataGenerator()->create_course();
+        $student = $this->getDataGenerator()->create_user();
+        $instance = $this->getDataGenerator()->get_plugin_generator('mod_aidialogue')->create_instance(['course' => $course->id]);
+        $manager = new session_manager();
+        $session = $manager->create_session(
+            (int) $instance->id,
+            (int) $student->id,
+            activity_config::load_from_db((int) $instance->id),
+        );
+        $DB->update_record('aidialogue_session', (object) [
+            'id' => $session->id,
+            'status' => $status,
+            'timestarted' => 1000,
+            'timemodified' => 1000,
+        ]);
+
+        $manager->activate_session((int) $session->id);
+
+        $stored = $DB->get_record('aidialogue_session', ['id' => $session->id]);
+        $this->assertSame($status, $stored->status);
+        $this->assertEquals(1000, $stored->timestarted);
+        $this->assertEquals(1000, $stored->timemodified);
+    }
 }
