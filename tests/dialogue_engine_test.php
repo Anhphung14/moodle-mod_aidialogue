@@ -537,6 +537,19 @@ final class dialogue_engine_test extends \advanced_testcase {
     }
 
     /**
+     * Return the session_completed events caught by an event sink so far.
+     *
+     * @param \phpunit_event_sink $sink The sink.
+     * @return \mod_aidialogue\event\session_completed[]
+     */
+    private function completed_events(\phpunit_event_sink $sink): array {
+        return array_values(array_filter(
+            $sink->get_events(),
+            fn($event) => $event instanceof \mod_aidialogue\event\session_completed,
+        ));
+    }
+
+    /**
      * Data provider: the close step that fails first.
      *
      * @return array
@@ -575,6 +588,7 @@ final class dialogue_engine_test extends \advanced_testcase {
             array_slice($closereplies, 0, $failstep + 1), // Steps up to and including the failing one.
         );
         $engine = $this->engine_with_replies($firstreplies);
+        $sink = $this->redirectEvents();
 
         try {
             $engine->process_student_turn($config, $session, 'My first and only turn.');
@@ -582,6 +596,9 @@ final class dialogue_engine_test extends \advanced_testcase {
         } catch (\moodle_exception $e) {
             $this->assertSame('error:ajax', $e->errorcode);
         }
+
+        // The failed close does not report the session as completed.
+        $this->assertCount(0, $this->completed_events($sink));
 
         // The session is still active; finished steps are saved, later ones are not.
         $stored = $DB->get_record('aidialogue_session', ['id' => $session->id]);
@@ -605,6 +622,11 @@ final class dialogue_engine_test extends \advanced_testcase {
         $this->assertTrue($result['is_complete']);
         $this->assertSame('session_close', $result['move']);
         $this->assertSame($failstep >= 1 ? 'First goodbye.' : 'Second goodbye.', $result['ai_message']);
+
+        // The completion is reported once, by the retry that finished the close.
+        $completed = $this->completed_events($sink);
+        $this->assertCount(1, $completed);
+        $this->assertSame((int) $session->id, (int) $completed[0]->objectid);
 
         $closed = $DB->get_record('aidialogue_session', ['id' => $session->id]);
         $this->assertSame('complete', $closed->status);
