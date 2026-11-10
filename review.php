@@ -54,11 +54,35 @@ $student = $DB->get_record('user', ['id' => $session->userid], '*', MUST_EXIST);
 if ($action === 'savegrade' && confirm_sesskey()) {
     $rawgrade = required_param('teachergrade', PARAM_FLOAT);
     $grade    = max(0.0, min(100.0, $rawgrade));
+    $oldgrade = $session->teachergrade !== null ? (float) $session->teachergrade : null;
     $DB->set_field('aidialogue_session', 'teachergrade', $grade, ['id' => $session->id]);
+
+    $event = \mod_aidialogue\event\grade_updated::create([
+        'objectid' => $session->id,
+        'context' => $context,
+        'relateduserid' => $session->userid,
+        'other' => [
+            'oldgrade' => $oldgrade,
+            'newgrade' => $grade,
+        ],
+    ]);
+    $event->trigger();
+
     redirect(new moodle_url('/mod/aidialogue/review.php', ['id' => $cm->id, 'session' => $session->id]));
 }
 
 $PAGE->set_url('/mod/aidialogue/review.php', ['id' => $cm->id, 'session' => $session->id]);
+$event = \mod_aidialogue\event\report_viewed::create([
+    'objectid' => $cm->instance,
+    'context' => $context,
+    'relateduserid' => $session->userid,
+    'other' => [
+        'mode' => 'review',
+        'sessionid' => $session->id,
+    ],
+]);
+$event->trigger();
+
 $PAGE->set_pagelayout('report');
 $PAGE->add_body_class('limitedwidth');
 $PAGE->set_title(fullname($student));

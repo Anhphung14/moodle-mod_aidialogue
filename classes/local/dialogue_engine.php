@@ -106,6 +106,15 @@ class dialogue_engine {
         // Mark session active (timestarted not set yet — that's set on first student turn).
         // Status stays 'pending' until student sends the first message.
         // (activate_session is called in process_student_turn.)
+        $context = $this->get_context($config);
+        \mod_aidialogue\event\session_started::create([
+            'objectid' => $session->id,
+            'context' => $context,
+            'relateduserid' => $userid,
+            'other' => [
+                'attemptnumber' => $session->attemptnumber,
+            ],
+        ])->trigger();
 
         return [
             'session'          => $session,
@@ -401,6 +410,17 @@ class dialogue_engine {
 
         // Persist.
         $this->sessionmanager->close_session($session->id, $studentreport, $teacherreport, $aigrade, $earlyexit);
+        $context = $this->get_context($config);
+        \mod_aidialogue\event\session_completed::create([
+            'objectid' => $session->id,
+            'context' => $context,
+            'relateduserid' => $session->userid,
+            'other' => [
+                'aigrade' => $aigrade,
+                'earlyexit' => (bool) $earlyexit,
+                'attemptnumber' => $session->attemptnumber,
+            ],
+        ])->trigger();
 
         return [
             'ai_message'  => $closecontent,
@@ -575,5 +595,16 @@ EOT
             }
         }
         return $messages;
+    }
+
+    /**
+     * Get module context for the given activity config.
+     *
+     * @param activity_config $config Activity config.
+     * @return \context_module
+     */
+    private function get_context(activity_config $config): \context_module {
+        $cm = get_coursemodule_from_instance('aidialogue', $config->id, 0, false, MUST_EXIST);
+        return \context_module::instance($cm->id);
     }
 }

@@ -38,6 +38,15 @@ require_course_login($course, true, $cm);
 $context = context_module::instance($cm->id);
 require_capability('mod/aidialogue:viewreport', $context);
 
+$event = \mod_aidialogue\event\report_viewed::create([
+    'objectid' => $aidialogue->id,
+    'context' => $context,
+    'other' => [
+        'mode' => 'class',
+    ],
+]);
+$event->trigger();
+
 $PAGE->set_url('/mod/aidialogue/report.php', ['id' => $cm->id]);
 $PAGE->set_pagelayout('report');
 $PAGE->add_body_class('limitedwidth');
