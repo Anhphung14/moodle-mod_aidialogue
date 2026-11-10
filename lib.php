@@ -515,3 +515,59 @@ function aidialogue_extend_settings_navigation(settings_navigation $settingsnav,
         );
     }
 }
+
+/**
+ * Add elements to the course reset form.
+ *
+ * @param MoodleQuickForm $mform Form passed by reference.
+ */
+function aidialogue_reset_course_form_definition(&$mform): void {
+    $mform->addElement('header', 'aidialogueheader', get_string('modulenameplural', 'aidialogue'));
+    $mform->addElement('static', 'aidialoguedelete', get_string('delete'));
+    $mform->addElement('advcheckbox', 'reset_aidialogue_sessions', get_string('reset_aidialogue_sessions', 'aidialogue'));
+}
+
+/**
+ * Course reset form defaults.
+ *
+ * @param stdClass $course The course object.
+ * @return array Default values for the form.
+ */
+function aidialogue_reset_course_form_defaults(stdClass $course): array {
+    return ['reset_aidialogue_sessions' => 1];
+}
+
+/**
+ * Implementation of the reset course functionality, deleting dialogue sessions
+ * for activities in the given course.
+ *
+ * @param stdClass $data The data submitted from the reset course.
+ * @return array Status array.
+ */
+function aidialogue_reset_userdata(stdClass $data): array {
+    global $DB;
+
+    $componentstr = get_string('modulenameplural', 'aidialogue');
+    $status = [];
+
+    if (!empty($data->reset_aidialogue_sessions)) {
+        $dialogueids = $DB->get_fieldset_select('aidialogue', 'id', 'course = :courseid', ['courseid' => $data->courseid]);
+        if (!empty($dialogueids)) {
+            [$insql, $inparams] = $DB->get_in_or_equal($dialogueids);
+            $sessionids = $DB->get_fieldset_select('aidialogue_session', 'id', "aidialogueid {$insql}", $inparams);
+
+            if (!empty($sessionids)) {
+                $sessionmanager = new \mod_aidialogue\local\session_manager();
+                $sessionmanager->delete_sessions($sessionids);
+            }
+        }
+
+        $status[] = [
+            'component' => $componentstr,
+            'item' => get_string('reset_aidialogue_sessions', 'aidialogue'),
+            'error' => false,
+        ];
+    }
+
+    return $status;
+}

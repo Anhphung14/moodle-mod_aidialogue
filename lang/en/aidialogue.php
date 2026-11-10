@@ -193,6 +193,7 @@ $string['statuscomplete']       = 'Complete';
 $string['statusactive']         = 'Active';
 $string['statuspending']        = 'Pending';
 $string['nostudents']           = 'No students enrolled.';
+$string['reset_aidialogue_sessions'] = 'All dialogue sessions';
 
 // Teacher report — session review page (review.php).
 $string['rubriceval']            = 'Rubric evaluation';
